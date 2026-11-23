@@ -111,8 +111,10 @@ public:
 	[[nodiscard]] rpl::producer<> backRequests() const;
 	[[nodiscard]] rpl::producer<> closeRequests() const;
 	[[nodiscard]] rpl::producer<> closeEvents() const;
+	[[nodiscard]] rpl::producer<> fullscreenRequests() const;
 	void setBackAllowed(bool allowed);
 	void setCloseAllowed(bool allowed);
+	void setFullscreenAllowed(bool allowed);
 
 	void updateBackToggled();
 
@@ -204,6 +206,7 @@ private:
 
 	const style::PopupMenu &_menuSt;
 	object_ptr<IconButton> _close;
+	object_ptr<IconButton> _maximize;
 	object_ptr<IconButton> _menuToggle = { nullptr };
 	Fn<void(not_null<RpWidget*>, bool fullscreen)> _menuToggleCreated;
 	object_ptr<FadeWrapScaled<IconButton>> _searchToggle = { nullptr };
@@ -221,12 +224,14 @@ private:
 	std::vector<std::unique_ptr<ResizeEdge>> _resizeEdges;
 
 	std::unique_ptr<FullScreenButton> _fsClose;
+	std::unique_ptr<FullScreenButton> _fsMaximize;
 	std::unique_ptr<FullScreenButton> _fsMenuToggle;
 	std::unique_ptr<FadeWrapScaled<FullScreenButton>> _fsBack;
 	bool _fsAllowChildControls = false;
 
 	rpl::event_stream<> _synteticBackRequests;
 	rpl::event_stream<> _userCloseRequests;
+	rpl::event_stream<> _userFullscreenRequests;
 	rpl::event_stream<> _closeEvents;
 
 	int _titleHeight = 0;
@@ -235,6 +240,7 @@ private:
 	bool _useTransparency = true;
 	bool _backAllowed = false;
 	bool _closeAllowed = true;
+	bool _fullscreenAllowed = false;
 	style::margins _padding;
 
 	bool _dragging = false;

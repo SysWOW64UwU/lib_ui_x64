@@ -174,6 +174,18 @@ separatePanelMenu: IconButton(separatePanelClose) {
 
 	rippleAreaPosition: point(0px, 8px);
 }
+separatePanelFullscreen: IconButton(separatePanelClose) {
+	width: 44px;
+
+	icon: icon {{ "mediaview/title_viewer_button_maximize", boxTitleCloseFg }};
+	iconOver: icon {{ "mediaview/title_viewer_button_maximize", boxTitleCloseFgOver }};
+
+	rippleAreaPosition: point(0px, 8px);
+}
+separatePanelRestore: IconButton(separatePanelFullscreen) {
+	icon: icon {{ "mediaview/title_viewer_button_restore", boxTitleCloseFg }};
+	iconOver: icon {{ "mediaview/title_viewer_button_restore", boxTitleCloseFgOver }};
+}
 separatePanelMenuPosition: point(0px, 52px);
 separatePanelTitleFont: font(18px semibold);
 separatePanelTitle: FlatLabel(defaultFlatLabel) {
@@ -222,6 +234,14 @@ fullScreenPanelBack: IconButton(fullScreenPanelClose) {
 fullScreenPanelMenu: IconButton(fullScreenPanelClose) {
 	icon: icon {{ "title_menu_dots", radialFg }};
 	iconOver: icon {{ "title_menu_dots", radialFg }};
+}
+fullScreenPanelFullscreen: IconButton(fullScreenPanelClose) {
+	icon: icon {{ "mediaview/title_viewer_button_maximize", radialFg }};
+	iconOver: icon {{ "mediaview/title_viewer_button_maximize", radialFg }};
+}
+fullScreenPanelRestore: IconButton(fullScreenPanelFullscreen) {
+	icon: icon {{ "mediaview/title_viewer_button_restore", radialFg }};
+	iconOver: icon {{ "mediaview/title_viewer_button_restore", radialFg }};
 }
 
 webviewDialogButton: defaultBoxButton;

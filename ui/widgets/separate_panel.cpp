@@ -425,6 +425,7 @@ SeparatePanel::SeparatePanel(SeparatePanelArgs &&args)
 , _transientParent(std::move(args.transientParent))
 , _menuSt(args.menuSt ? *args.menuSt : st::popupMenuWithIcons)
 , _close(this, st::separatePanelClose)
+, _maximize(this, st::separatePanelFullscreen)
 , _back(this, object_ptr<IconButton>(this, st::separatePanelBack))
 , _body(this)
 , _titleHeight(st::separatePanelTitleHeight) {
@@ -510,6 +511,9 @@ void SeparatePanel::initControls() {
 			st::fadeWrapDuration);
 	}, _back->lifetime());
 	_back->hide(anim::type::instant);
+	_maximize->clicks() | rpl::to_empty | rpl::start_to_stream(
+		_userFullscreenRequests,
+		_maximize->lifetime());
 	if (_fsBack) {
 		_fsBack->hide(anim::type::instant);
 	}
@@ -519,6 +523,7 @@ void SeparatePanel::initControls() {
 	) | rpl::on_next([=](bool fullscreen) {
 		if (!fullscreen) {
 			_fsClose = nullptr;
+			_fsMaximize = nullptr;
 			_fsMenuToggle = nullptr;
 			_fsBack = nullptr;
 		} else if (!_fsClose) {
@@ -534,11 +539,15 @@ void SeparatePanel::initControls() {
 		const auto padding = computePadding();
 		_back->moveToLeft(padding.left(), padding.top());
 		_close->moveToRight(padding.right(), padding.top());
+		_maximize->moveToRight(
+			padding.right() + _close->width(),
+			padding.top());
 		updateTitleGeometry(width);
 	}, lifetime());
 
 	_back->raise();
 	_close->raise();
+	_maximize->raise();
 }
 
 void SeparatePanel::createFullScreenButtons() {
@@ -549,6 +558,17 @@ void SeparatePanel::createFullScreenButtons() {
 	_fsClose->clicks() | rpl::to_empty | rpl::start_to_stream(
 		_userCloseRequests,
 		_fsClose->lifetime());
+
+	_fsMaximize = nullptr;
+	if (_fullscreenAllowed) {
+		_fsMaximize = std::make_unique<FullScreenButton>(
+			this,
+			st::fullScreenPanelRestore);
+		initFullScreenButton(_fsMaximize.get());
+		_fsMaximize->clicks() | rpl::to_empty | rpl::start_to_stream(
+			_userFullscreenRequests,
+			_fsMaximize->lifetime());
+	}
 
 	_fsBack = std::make_unique<FadeWrapScaled<FullScreenButton>>(
 		this,
@@ -586,10 +606,20 @@ void SeparatePanel::createFullScreenButtons() {
 		_fsBack->resize(st::fullScreenPanelBack.width, st::fullScreenPanelBack.height);
 		_fsClose->move(geometry.topLeft() + QPoint(geometry.width() - _fsClose->width() - shift.x(), shift.y()));
 		_fsClose->resize(st::fullScreenPanelClose.width, st::fullScreenPanelClose.height);
+		if (_fsMaximize) {
+			_fsMaximize->move(_fsClose->pos()
+				- QPoint(_fsMaximize->width() + shift.x(), 0));
+			_fsMaximize->resize(
+				st::fullScreenPanelFullscreen.width,
+				st::fullScreenPanelFullscreen.height);
+		}
 		if (_fsMenuToggle) {
-			_fsMenuToggle->move(_fsClose->pos()
+			_fsMenuToggle->move(
+				(_fsMaximize ? _fsMaximize->pos() : _fsClose->pos())
 				- QPoint(_fsMenuToggle->width() + shift.x(), 0));
-			_fsMenuToggle->resize(st::fullScreenPanelMenu.width, st::fullScreenPanelMenu.height);
+			_fsMenuToggle->resize(
+				st::fullScreenPanelMenu.width,
+				st::fullScreenPanelMenu.height);
 		}
 	}, _fsClose->lifetime());
 }
@@ -653,6 +683,9 @@ void SeparatePanel::overrideTitleColor(std::optional<QColor> color) {
 		: nullptr;
 	updateTitleButtonColors(_back->entity());
 	updateTitleButtonColors(_close.data());
+	if (_fullscreenAllowed) {
+		updateTitleButtonColors(_maximize.data());
+	}
 	if (_menuToggle) {
 		updateTitleButtonColors(_menuToggle.data());
 	}
@@ -719,6 +752,7 @@ void SeparatePanel::updateTitleGeometry(int newWidth) const {
 		_title->resizeToWidth(
 			std::min(
 				available
+					- (_fullscreenAllowed ? _maximize->width() : 0)
 					- (_menuToggle ? _menuToggle->width() : 0)
 					- (_searchToggle ? _searchToggle->width() : 0)
 					- (_titleBadge
@@ -777,6 +811,10 @@ rpl::producer<> SeparatePanel::closeEvents() const {
 	return _closeEvents.events();
 }
 
+rpl::producer<> SeparatePanel::fullscreenRequests() const {
+	return _userFullscreenRequests.events();
+}
+
 void SeparatePanel::setBackAllowed(bool allowed) {
 	_backAllowed = allowed;
 	updateBackToggled();
@@ -786,6 +824,14 @@ void SeparatePanel::setCloseAllowed(bool allowed) {
 	if (_closeAllowed != allowed) {
 		_closeAllowed = allowed;
 		updateControlsVisibility(_fullscreen.current());
+	}
+}
+
+void SeparatePanel::setFullscreenAllowed(bool allowed) {
+	if (_fullscreenAllowed != allowed) {
+		_fullscreenAllowed = allowed;
+		updateControlsVisibility(_fullscreen.current());
+		updateControlsGeometry();
 	}
 }
 
@@ -815,7 +861,8 @@ void SeparatePanel::setMenuAllowed(
 	) | rpl::on_next([=](int width, bool) {
 		const auto padding = computePadding();
 		_menuToggle->moveToRight(
-			padding.right() + _close->width(),
+			padding.right() + _close->width()
+				+ (_fullscreenAllowed ? _maximize->width() : 0),
 			padding.top());
 	}, _menuToggle->lifetime());
 	updateTitleGeometry(width());
@@ -1169,6 +1216,7 @@ void SeparatePanel::updateControlsVisibility(bool fullscreen) {
 		_titleBadge->setVisible(!fullscreen);
 	}
 	_close->setVisible(_closeAllowed && !fullscreen);
+	_maximize->setVisible(_fullscreenAllowed && !fullscreen);
 	if (_menuToggle) {
 		_menuToggle->setVisible(!fullscreen);
 	}

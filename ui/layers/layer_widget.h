@@ -195,6 +195,7 @@ public:
 	void showMainMenu(
 		object_ptr<LayerWidget> menu,
 		anim::type animated);
+	void setMainMenuOnRight(bool onRight);
 	bool takeToThirdSection();
 
 	bool canSetFocus() const;

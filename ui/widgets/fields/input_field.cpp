@@ -1948,13 +1948,7 @@ InputField::InputField(
 , _maxHeight(st.heightMax)
 , _inner(std::make_unique<Inner>(this))
 , _lastTextWithTags(value)
-, _placeholderFull(std::move(placeholder))
-, _pasteShortcut(
-	Qt::CTRL | Qt::SHIFT | Qt::Key_V,
-	_inner.get(),
-	nullptr,
-	nullptr,
-	Qt::WidgetShortcut) {
+, _placeholderFull(std::move(placeholder)) {
 #ifdef Q_OS_MAC
 	_systemTextReplaces = std::make_unique<SystemTextReplaces>();
 #endif
@@ -2074,13 +2068,6 @@ InputField::InputField(
 	) | rpl::on_next([] {
 		Integration::Instance().textActionsUpdated();
 	}, lifetime());
-	base::qt_signal_producer(
-		&_pasteShortcut,
-		&QShortcut::activated
-	) | rpl::on_next([=] {
-		_inner->paste();
-	}, lifetime());
-
 	setupMarkdownShortcuts();
 
 	const auto bar = _inner->verticalScrollBar();
@@ -6261,6 +6248,31 @@ void InputField::insertFromMimeDataInner(const QMimeData *source) {
 	if (!_insertedTagsDelayClear) {
 		_insertedTags.clear();
 	}
+}
+
+bool InputField::PastePlainToFocused() {
+	auto widget = QApplication::focusWidget();
+	while (widget) {
+		if (const auto field = dynamic_cast<InputField*>(widget)) {
+			field->pastePlainText();
+			return true;
+		}
+		widget = widget->parentWidget();
+	}
+	return false;
+}
+
+void InputField::pastePlainText() {
+	auto text = QGuiApplication::clipboard()->text();
+	text.replace(u"\r\n"_q, u"\n"_q);
+	_insertedTags.clear();
+	_insertedTagsAreFromMime = false;
+	const auto cursor = textCursor();
+	insertWithTags(
+		{ cursor.selectionStart(), cursor.selectionEnd() },
+		{ text, {} });
+	ensureCursorVisible();
+	_insertedTags.clear();
 }
 
 void InputField::resizeEvent(QResizeEvent *e) {

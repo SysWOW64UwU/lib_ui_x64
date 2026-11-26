@@ -405,6 +405,10 @@ public:
 		_mimeDataHook = std::move(hook);
 	}
 
+	// Pastes the clipboard text as plain text into the currently focused
+	// InputField, if any. Returns true when a field handled the paste.
+	[[nodiscard]] static bool PastePlainToFocused();
+
 	const rpl::variable<int> &scrollTop() const;
 	int scrollTopMax() const;
 	void scrollTo(int top);
@@ -510,6 +514,7 @@ private:
 	QMimeData *createMimeDataFromSelectionInner() const;
 	bool canInsertFromMimeDataInner(const QMimeData *source) const;
 	void insertFromMimeDataInner(const QMimeData *source);
+	void pastePlainText();
 	TextWithTags getTextWithTagsSelected() const;
 
 	void documentContentsChanged(
@@ -743,7 +748,6 @@ private:
 	rpl::event_stream<MarkdownTag> _markdownTagApplies;
 
 	std::vector<std::unique_ptr<QShortcut>> _markdownShortcuts;
-	QShortcut _pasteShortcut;
 
 	rpl::event_stream<bool> _focusedChanges;
 	rpl::event_stream<> _heightChanges;

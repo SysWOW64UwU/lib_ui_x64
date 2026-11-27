@@ -13,9 +13,9 @@
 #include "base/options.h"
 #include "base/platform/base_platform_info.h"
 
-#if !defined(Q_OS_MAC) && !defined(Q_OS_WIN)
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
 #include "base/platform/linux/base_linux_library.h"
-#endif // !Q_OS_MAC && !Q_OS_WIN
+#endif // !Q_OS_MACOS && !Q_OS_WIN
 
 #include <QtCore/QSet>
 #include <QtCore/QFile>
@@ -36,22 +36,22 @@
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
 #include <rhi/qrhi.h>
 #include <qpa/qplatformbackingstore.h>
-#if !defined(Q_OS_MAC) && !defined(Q_OS_WIN)
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
 #include <QtGui/QOffscreenSurface>
 #include <QtGui/QSurfaceFormat>
 #if QT_CONFIG(vulkan)
 #include <QtGui/QVulkanInstance>
 #endif // QT_CONFIG(vulkan)
-#endif // !Q_OS_MAC && !Q_OS_WIN
+#endif // !Q_OS_MACOS && !Q_OS_WIN
 #endif // Qt >= 6.7 && !DESKTOP_APP_DISABLE_PRIVATE_QT_API
 
-#if !defined(Q_OS_MAC) && !defined(Q_OS_WIN)
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
 extern "C" {
 void _libOpenGL_so_tramp_resolve_all(void) __attribute__((weak));
 void _libEGL_so_tramp_resolve_all(void) __attribute__((weak));
 void _libGLX_so_tramp_resolve_all(void) __attribute__((weak));
 } // extern "C"
-#endif // !Q_OS_MAC && !Q_OS_WIN
+#endif // !Q_OS_MACOS && !Q_OS_WIN
 
 #define LOG_ONCE(x) [[maybe_unused]] static auto logged = [&] { LOG(x); return true; }();
 
@@ -72,7 +72,11 @@ base::options::toggle OptionUseQtRhi({
 	.description = "Render the main window on the GPU instead of the CPU.",
 	.defaultValue = true,
 	.scope = [] {
+#ifndef DESKTOP_APP_DISABLE_PRIVATE_QT_API
 		return QLibraryInfo::version() >= QVersionNumber(6, 7);
+#else // !DESKTOP_APP_DISABLE_PRIVATE_QT_API
+		return false;
+#endif // DESKTOP_APP_DISABLE_PRIVATE_QT_API
 	},
 	.restartRequired = true,
 });
@@ -95,8 +99,7 @@ base::options::toggle OptionForceANGLE({
 
 [[nodiscard]] bool VulkanRhiAvailable() {
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && QT_CONFIG(vulkan) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
-	return !Platform::IsMac()
-		&& !Platform::IsWindows()
+	return Platform::IsWayland()
 		&& QLibraryInfo::version() >= QVersionNumber(6, 7);
 #else
 	return false;
@@ -108,7 +111,7 @@ base::options::toggle OptionEnableVulkanRhi({
 	.name = "Enable Vulkan renderer",
 	.description = "Use Vulkan for GPU rendering "
 		"instead of OpenGL when it is available.",
-	.defaultValue = false,
+	.defaultValue = true,
 	.scope = [] { return VulkanRhiAvailable(); },
 	.restartRequired = true,
 });
@@ -143,7 +146,7 @@ void CrashCheckStart(CrashCheckStage stage) {
 }
 
 [[nodiscard]] bool OpenGLLibraryAvailable() {
-#if !defined(Q_OS_MAC) && !defined(Q_OS_WIN)
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
 	static const auto available = [] {
 		const auto check = [](void (*tramp)(), const char *name) {
 			return !tramp
@@ -160,13 +163,13 @@ void CrashCheckStart(CrashCheckStage stage) {
 		return true;
 	}();
 	return available;
-#else // !Q_OS_MAC && !Q_OS_WIN
+#else // !Q_OS_MACOS && !Q_OS_WIN
 	return true;
-#endif // Q_OS_MAC || Q_OS_WIN
+#endif // Q_OS_MACOS || Q_OS_WIN
 }
 
 #if QT_VERSION >= QT_VERSION_CHECK(6, 7, 0) && !defined DESKTOP_APP_DISABLE_PRIVATE_QT_API
-#if !defined(Q_OS_MAC) && !defined(Q_OS_WIN) && QT_CONFIG(vulkan)
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN) && QT_CONFIG(vulkan)
 // Before 545 NVIDIA presents Vulkan via egl-wayland, crashing on first frame.
 constexpr auto kNvidiaNativeWaylandWsiSince = 545;
 
@@ -250,28 +253,28 @@ constexpr auto kNvidiaNativeWaylandWsiSince = 545;
 		.vulkan = true,
 	};
 }
-#endif // !Q_OS_MAC && !Q_OS_WIN && QT_CONFIG(vulkan)
+#endif // !Q_OS_MACOS && !Q_OS_WIN && QT_CONFIG(vulkan)
 
 [[nodiscard]] RhiCapabilities ProbeRhiCapabilities() {
 	const auto flags = qEnvironmentVariableIntValue(
 		"QSG_RHI_PREFER_SOFTWARE_RENDERER")
 		? QRhi::Flags(QRhi::PreferSoftwareRenderer)
 		: QRhi::Flags();
-#if !defined(Q_OS_MAC) && !defined(Q_OS_WIN)
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_WIN)
 	auto offscreen = std::unique_ptr<QOffscreenSurface>();
-#endif // !Q_OS_MAC && !Q_OS_WIN
+#endif // !Q_OS_MACOS && !Q_OS_WIN
 	auto rhi = std::unique_ptr<QRhi>();
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	if (Platform::MetalSupported()) {
 		auto params = QRhiMetalInitParams();
 		rhi.reset(QRhi::create(QRhi::Metal, &params, flags));
 	}
-#elif defined(Q_OS_WIN) // Q_OS_MAC
+#elif defined(Q_OS_WIN) // Q_OS_MACOS
 	auto params = QRhiD3D11InitParams();
 	rhi.reset(QRhi::create(QRhi::D3D11, &params, flags));
-#else // Q_OS_MAC || Q_OS_WIN
+#else // Q_OS_MACOS || Q_OS_WIN
 #if QT_CONFIG(vulkan)
-	if (OptionEnableVulkanRhi.value()) {
+	if (OptionEnableVulkanRhi.relevant() && OptionEnableVulkanRhi.value()) {
 		CrashCheckStart(CrashCheckStage::Vulkan);
 		if (const auto vulkan = ProbeVulkanCapabilities(flags)) {
 			return *vulkan;
@@ -304,7 +307,7 @@ constexpr auto kNvidiaNativeWaylandWsiSince = 545;
 	if (!rhi) {
 		tryCreate(QSurfaceFormat::defaultFormat());
 	}
-#endif // Q_OS_MAC || Q_OS_WIN
+#endif // Q_OS_MACOS || Q_OS_WIN
 	if (!rhi) {
 		LOG(("RHI: Probe failed, no device."));
 		return {};
